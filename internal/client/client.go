@@ -24,6 +24,7 @@ type Client struct {
 	token      string
 	retry      RetryConfig
 	logger     *Logger
+	timeouts   TimeoutConfig
 }
 
 // NewClient creates a new HiiRetail IAM API client
@@ -34,6 +35,7 @@ func NewClient(baseURL string, token string) *Client {
 		token:      token,
 		retry:      DefaultRetryConfig,
 		logger:     NewLogger(LogLevelInfo),
+		timeouts:   DefaultTimeoutConfig,
 	}
 }
 
@@ -46,77 +48,111 @@ type Group struct {
 
 // CreateGroup creates a new IAM group
 func (c *Client) CreateGroup(ctx context.Context, name string, description string) (*Group, error) {
-	payload := map[string]interface{}{
-		"name":        name,
-		"description": description,
-	}
+	var result *Group
+	err := withTimeout(ctx, c.timeouts.Create, func(ctx context.Context) error {
+	var result *Group
+	err := withTimeout(ctx, c.timeouts.Create, func(ctx context.Context) error {
+		payload := map[string]interface{}{
+			"name":        name,
+			"description": description,
+		}
 
-	data, err := json.Marshal(payload)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal group payload: %w", err)
-	}
+		data, err := json.Marshal(payload)
+		if err != nil {
+			return fmt.Errorf("failed to marshal group payload: %w", err)
+		}
 
-	req, err := c.newRequest(ctx, http.MethodPost, "/groups", strings.NewReader(string(data)))
+		req, err := c.newRequest(ctx, http.MethodPost, "/groups", strings.NewReader(string(data)))
+		if err != nil {
+			return err
+		}
+
+		var group Group
+		if err := c.do(req, &group); err != nil {
+			return err
+		}
+
+		result = &group
+		return nil
+	})
+
 	if err != nil {
 		return nil, err
 	}
 
-	var group Group
-	if err := c.do(req, &group); err != nil {
-		return nil, err
-	}
-
-	return &group, nil
+	return result, nil
 }
 
 // GetGroup retrieves an IAM group by ID
 func (c *Client) GetGroup(ctx context.Context, id string) (*Group, error) {
-	req, err := c.newRequest(ctx, http.MethodGet, fmt.Sprintf("/groups/%s", id), nil)
+	var result *Group
+	err := withTimeout(ctx, c.timeouts.Read, func(ctx context.Context) error {
+		req, err := c.newRequest(ctx, http.MethodGet, fmt.Sprintf("/groups/%s", id), nil)
+		if err != nil {
+			return err
+		}
+
+		var group Group
+		if err := c.do(req, &group); err != nil {
+			return err
+		}
+
+		result = &group
+		return nil
+	})
+
 	if err != nil {
 		return nil, err
 	}
 
-	var group Group
-	if err := c.do(req, &group); err != nil {
-		return nil, err
-	}
-
-	return &group, nil
+	return result, nil
 }
 
 // UpdateGroup updates an existing IAM group
 func (c *Client) UpdateGroup(ctx context.Context, id string, name string, description string) (*Group, error) {
-	payload := map[string]interface{}{
-		"name":        name,
-		"description": description,
-	}
+	var result *Group
+	err := withTimeout(ctx, c.timeouts.Update, func(ctx context.Context) error {
+		payload := map[string]interface{}{
+			"name":        name,
+			"description": description,
+		}
 
-	data, err := json.Marshal(payload)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal group payload: %w", err)
-	}
+		data, err := json.Marshal(payload)
+		if err != nil {
+			return fmt.Errorf("failed to marshal group payload: %w", err)
+		}
 
-	req, err := c.newRequest(ctx, http.MethodPut, fmt.Sprintf("/groups/%s", id), strings.NewReader(string(data)))
+		req, err := c.newRequest(ctx, http.MethodPut, fmt.Sprintf("/groups/%s", id), strings.NewReader(string(data)))
+		if err != nil {
+			return err
+		}
+
+		var group Group
+		if err := c.do(req, &group); err != nil {
+			return err
+		}
+
+		result = &group
+		return nil
+	})
+
 	if err != nil {
 		return nil, err
 	}
 
-	var group Group
-	if err := c.do(req, &group); err != nil {
-		return nil, err
-	}
-
-	return &group, nil
+	return result, nil
 }
 
 // DeleteGroup deletes an IAM group
 func (c *Client) DeleteGroup(ctx context.Context, id string) error {
-	req, err := c.newRequest(ctx, http.MethodDelete, fmt.Sprintf("/groups/%s", id), nil)
-	if err != nil {
-		return err
-	}
+	return withTimeout(ctx, c.timeouts.Delete, func(ctx context.Context) error {
+		req, err := c.newRequest(ctx, http.MethodDelete, fmt.Sprintf("/groups/%s", id), nil)
+		if err != nil {
+			return err
+		}
 
-	return c.do(req, nil)
+		return c.do(req, nil)
+	})
 }
 
 // newRequest creates a new HTTP request with common headers

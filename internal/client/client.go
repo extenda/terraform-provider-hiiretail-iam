@@ -50,8 +50,6 @@ type Group struct {
 func (c *Client) CreateGroup(ctx context.Context, name string, description string) (*Group, error) {
 	var result *Group
 	err := withTimeout(ctx, c.timeouts.Create, func(ctx context.Context) error {
-	var result *Group
-	err := withTimeout(ctx, c.timeouts.Create, func(ctx context.Context) error {
 		payload := map[string]interface{}{
 			"name":        name,
 			"description": description,

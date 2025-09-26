@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -59,12 +58,16 @@ func TestProviderConfigure_MissingToken(t *testing.T) {
 	schema := tftypes.Object{
 		AttributeTypes: map[string]tftypes.Type{
 			"openapi_schema": tftypes.String,
+			"environment":   tftypes.String,
+			"base_url":      tftypes.String,
 		},
 	}
 	config := tfsdk.Config{
 		Schema: schemaResp.Schema,
-		Raw:    tftypes.NewValue(schema, map[string]tftypes.Value{
+		Raw: tftypes.NewValue(schema, map[string]tftypes.Value{
 			"openapi_schema": tftypes.NewValue(tftypes.String, nil),
+			"environment":   tftypes.NewValue(tftypes.String, nil),
+			"base_url":      tftypes.NewValue(tftypes.String, nil),
 		}),
 	}
 
@@ -94,6 +97,8 @@ func TestProviderConfigure_ValidConfig(t *testing.T) {
 			name: "Valid config with default settings",
 			config: map[string]tftypes.Value{
 				"openapi_schema": tftypes.NewValue(tftypes.String, "https://iam-api.retailsvc.com/schemas/v1/openapi.json"),
+				"environment":    tftypes.NewValue(tftypes.String, nil),
+				"base_url":      tftypes.NewValue(tftypes.String, nil),
 			},
 			envToken: "test-token",
 			wantErr:  false,
@@ -101,7 +106,9 @@ func TestProviderConfigure_ValidConfig(t *testing.T) {
 		{
 			name: "Valid config with test environment",
 			config: map[string]tftypes.Value{
-				"environment": tftypes.NewValue(tftypes.String, "test"),
+				"openapi_schema": tftypes.NewValue(tftypes.String, nil),
+				"environment":    tftypes.NewValue(tftypes.String, "test"),
+				"base_url":      tftypes.NewValue(tftypes.String, nil),
 			},
 			envToken: "test-token",
 			wantErr:  false,
@@ -109,7 +116,9 @@ func TestProviderConfigure_ValidConfig(t *testing.T) {
 		{
 			name: "Valid config with custom base_url",
 			config: map[string]tftypes.Value{
-				"base_url": tftypes.NewValue(tftypes.String, "https://custom-api.example.com"),
+				"openapi_schema": tftypes.NewValue(tftypes.String, nil),
+				"environment":    tftypes.NewValue(tftypes.String, nil),
+				"base_url":      tftypes.NewValue(tftypes.String, "https://custom-api.example.com"),
 			},
 			envToken: "test-token",
 			wantErr:  false,
@@ -117,7 +126,9 @@ func TestProviderConfigure_ValidConfig(t *testing.T) {
 		{
 			name: "Invalid environment value",
 			config: map[string]tftypes.Value{
-				"environment": tftypes.NewValue(tftypes.String, "invalid"),
+				"openapi_schema": tftypes.NewValue(tftypes.String, nil),
+				"environment":    tftypes.NewValue(tftypes.String, "invalid"),
+				"base_url":      tftypes.NewValue(tftypes.String, nil),
 			},
 			envToken:    "test-token",
 			wantErr:     true,
@@ -158,7 +169,8 @@ func TestProviderConfigure_ValidConfig(t *testing.T) {
 			// Set HIIRETAIL_TOKEN environment variable for testing
 			t.Setenv("HIIRETAIL_TOKEN", tt.envToken)
 
-			p.Configure(ctx, req, resp)
+			provider := &HiiRetailProvider{}
+			provider.Configure(context.Background(), req, resp)
 
 			if tt.wantErr {
 				assert.True(t, resp.Diagnostics.HasError())
@@ -172,9 +184,4 @@ func TestProviderConfigure_ValidConfig(t *testing.T) {
 			}
 		})
 	}
-	_ = os.Setenv("HIIRETAIL_TOKEN", "test-token")
-	
-	p.Configure(ctx, req, resp)
-
-	assert.False(t, resp.Diagnostics.HasError())
 }

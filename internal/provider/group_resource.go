@@ -15,12 +15,15 @@ var _ resource.Resource = &GroupResource{}
 var _ resource.ResourceWithImportState = &GroupResource{}
 
 func NewGroupResource() resource.Resource {
-	return &GroupResource{}
+	return &GroupResource{
+		logger: client.NewLogger(client.LogLevelInfo),
+	}
 }
 
 // GroupResource defines the resource implementation.
 type GroupResource struct {
 	client client.IClient
+	logger *client.Logger
 }
 
 // GroupResourceModel describes the resource data model.
@@ -113,11 +116,18 @@ func (r *GroupResource) Read(ctx context.Context, req resource.ReadRequest, resp
 	// Get refreshed group value from HiiRetail
 	group, err := r.client.GetGroup(ctx, data.ID.ValueString())
 	if err != nil {
+		if client.IsResourceNotFound(err) {
+			// If the resource does not exist, remove it from state
+			r.logger.Info("Group %s no longer exists", data.ID.ValueString())
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read group, got error: %s", err))
 		return
 	}
 
 	// Map response body to schema
+	data.ID = types.StringValue(group.ID)
 	data.Name = types.StringValue(group.Name)
 	data.Description = types.StringValue(group.Description)
 
@@ -163,6 +173,11 @@ func (r *GroupResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 	// Delete existing group
 	err := r.client.DeleteGroup(ctx, data.ID.ValueString())
 	if err != nil {
+		if client.IsResourceNotFound(err) {
+			// If the resource is already gone, that's okay
+			r.logger.Info("Group %s already deleted", data.ID.ValueString())
+			return
+		}
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete group, got error: %s", err))
 		return
 	}
@@ -172,6 +187,11 @@ func (r *GroupResource) ImportState(ctx context.Context, req resource.ImportStat
 	// Read the group data directly
 	group, err := r.client.GetGroup(ctx, req.ID)
 	if err != nil {
+		if client.IsResourceNotFound(err) {
+			resp.Diagnostics.AddError("Resource Not Found", 
+				fmt.Sprintf("Unable to find group %s for import", req.ID))
+			return
+		}
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read group during import, got error: %s", err))
 		return
 	}

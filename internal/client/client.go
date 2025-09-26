@@ -211,6 +211,22 @@ func (c *Client) do(req *http.Request, v interface{}) error {
 	if resp.StatusCode >= 400 && !isRetryable(resp, nil) {
 		body, _ := io.ReadAll(resp.Body)
 		c.logger.Error("Request failed with status %d: %s", resp.StatusCode, string(body))
+		
+		if resp.StatusCode == http.StatusNotFound {
+			// Extract resource type from URL path
+			pathParts := strings.Split(strings.Trim(req.URL.Path, "/"), "/")
+			resourceType := ""
+			id := ""
+			if len(pathParts) >= 2 {
+				resourceType = pathParts[0]
+				id = pathParts[1]
+			}
+			return &ResourceNotFoundError{
+				ResourceType: resourceType,
+				ID:          id,
+			}
+		}
+		
 		return fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 

@@ -7,6 +7,7 @@ import (
 	"github.com/extenda/terraform-provider-hiiretail-iam/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -20,13 +21,18 @@ func NewGroupResource() resource.Resource {
 	}
 }
 
-// GroupResource defines the resource implementation.
+// GroupResource defines the implementation of the hiiretail_iam_group resource.
+// It handles the lifecycle (create, read, update, delete) of IAM groups
+// in the HiiRetail system, ensuring proper state management and error handling.
 type GroupResource struct {
 	client client.IClient
 	logger *client.Logger
 }
 
-// GroupResourceModel describes the resource data model.
+// GroupResourceModel describes the resource data model for an IAM group.
+// It maps the API response to Terraform's schema attributes, handling
+// both required and computed fields in a type-safe manner using the
+// Terraform Plugin Framework's types.
 type GroupResourceModel struct {
 	ID          types.String `tfsdk:"id"`
 	Name        types.String `tfsdk:"name"`
@@ -39,19 +45,25 @@ func (r *GroupResource) Metadata(ctx context.Context, req resource.MetadataReque
 
 func (r *GroupResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages an IAM group.",
+		Description: "Manages an IAM group in HiiRetail. Groups are collections of users that share the same access permissions.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The group identifier.",
 				Computed:    true,
 			},
 			"name": schema.StringAttribute{
-				Description: "The name of the group.",
+				Description: "The name of the group. Must be between 3 and 128 characters, start with a letter, and contain only letters, numbers, hyphens (-), and underscores (_).",
 				Required:    true,
+				Validators: []validator.String{
+					groupNameValidator{},
+				},
 			},
 			"description": schema.StringAttribute{
-				Description: "A description of the group.",
+				Description: "A description of the group explaining its purpose. Must be between 1 and 256 characters.",
 				Required:    true,
+				Validators: []validator.String{
+					groupDescriptionValidator{},
+				},
 			},
 		},
 	}
@@ -90,7 +102,7 @@ func (r *GroupResource) Create(ctx context.Context, req resource.CreateRequest, 
 	// Create new group
 	group, err := r.client.CreateGroup(ctx, data.Name.ValueString(), data.Description.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create group, got error: %s", err))
+		resp.Diagnostics.AddError("Failed to Create Group", fmt.Sprintf("Could not create IAM group '%s'. This might be due to a name conflict or invalid input. Original error: %s", data.Name.ValueString(), err))
 		return
 	}
 
@@ -122,7 +134,7 @@ func (r *GroupResource) Read(ctx context.Context, req resource.ReadRequest, resp
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read group, got error: %s", err))
+		resp.Diagnostics.AddError("Failed to Read Group", fmt.Sprintf("Could not read IAM group (ID: %s). This might be due to insufficient permissions or network issues. Original error: %s", data.ID.ValueString(), err))
 		return
 	}
 
@@ -148,7 +160,7 @@ func (r *GroupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	// Update existing group
 	group, err := r.client.UpdateGroup(ctx, data.ID.ValueString(), data.Name.ValueString(), data.Description.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update group, got error: %s", err))
+		resp.Diagnostics.AddError("Failed to Update Group", fmt.Sprintf("Could not update IAM group '%s' (ID: %s). This might be due to concurrent modifications or invalid input. Original error: %s", data.Name.ValueString(), data.ID.ValueString(), err))
 		return
 	}
 
@@ -178,7 +190,7 @@ func (r *GroupResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 			r.logger.Info("Group %s already deleted", data.ID.ValueString())
 			return
 		}
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete group, got error: %s", err))
+		resp.Diagnostics.AddError("Failed to Delete Group", fmt.Sprintf("Could not delete IAM group (ID: %s). This might be due to the group having existing members or dependencies. Original error: %s", data.ID.ValueString(), err))
 		return
 	}
 }

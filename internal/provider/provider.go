@@ -10,7 +10,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 )
 
 // Ensure the implementation satisfies the expected interfaces
@@ -29,6 +31,8 @@ type HiiRetailProvider struct {
 // HiiRetailProviderModel describes the provider data model.
 type HiiRetailProviderModel struct {
 	OpenAPISchema types.String `tfsdk:"openapi_schema"`
+	Environment   types.String `tfsdk:"environment"`
+	BaseURL      types.String `tfsdk:"base_url"`
 }
 
 func New(version string) func() provider.Provider {
@@ -54,6 +58,17 @@ func (p *HiiRetailProvider) Schema(_ context.Context, _ provider.SchemaRequest, 
 				Sensitive:  false,
 				Description: "OpenAPI schema URL for the HiiRetail IAM API",
 			},
+			"environment": schema.StringAttribute{
+				Optional:    true,
+				Description: "The HiiRetail environment to use. Valid values are 'test' or 'live'. Defaults to 'live'.",
+				Validators: []validator.String{
+					stringvalidator.OneOf("test", "live"),
+				},
+			},
+			"base_url": schema.StringAttribute{
+				Optional:    true,
+				Description: "Override the API endpoint URL. If specified, takes precedence over environment.",
+			},
 		},
 	}
 }
@@ -67,8 +82,28 @@ func (p *HiiRetailProvider) Configure(ctx context.Context, req provider.Configur
 		return
 	}
 
-	if config.OpenAPISchema.IsNull() {
-		config.OpenAPISchema = types.StringValue("https://iam-api.retailsvc.com/schemas/v1/openapi.json")
+	// Create a URL resolver with environment settings
+	resolver := NewURLResolver(
+		config.Environment.ValueString(),
+		config.BaseURL.ValueString(),
+	)
+
+	// Use the resolver to determine the API URL
+	apiURL := config.OpenAPISchema.ValueString()
+	if apiURL == "" {
+		apiURL = resolver.ResolveURL()
+	}
+
+	// Validate environment if specified
+	if !config.Environment.IsNull() {
+		if err := resolver.ValidateEnvironment(); err != nil {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("environment"),
+				"Invalid Environment Configuration",
+				err.Error(),
+			)
+			return
+		}
 	}
 
 	// Get the API token from the environment
@@ -83,7 +118,7 @@ func (p *HiiRetailProvider) Configure(ctx context.Context, req provider.Configur
 	}
 
 	// Initialize a new HiiRetail client using the configuration
-	var c client.IClient = client.NewClient(config.OpenAPISchema.ValueString(), token)
+	var c client.IClient = client.NewClient(apiURL, token)
 
 	resp.DataSourceData = c
 	resp.ResourceData = c

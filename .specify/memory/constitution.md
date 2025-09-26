@@ -1,50 +1,120 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+# Terraform Provider Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Provider Foundations
+Every feature must align with the core Terraform Provider Development Framework (Plugin Framework) principles:
+- Use Plugin Framework APIs and paradigms consistently
+- Follow HashiCorp's provider development patterns
+- Support proper state management and Terraform lifecycle
+- Implement data source/resource distinction correctly
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### II. Testing Fundamentals
+Test-driven development is mandatory for all provider features:
+- Acceptance tests required for every resource and data source
+- Unit tests for complex validation or computation logic
+- Test fixtures must be self-contained and cleaned up
+- Test cases must cover create, read, update, delete flows
+- Mock external API calls in unit tests
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### III. Schema Contracts
+Provider schema changes follow strict versioning rules:
+- Breaking changes require major version bump
+- Schema must be backwards compatible within major version
+- Required fields clearly documented with constraints
+- Computed fields marked appropriately
+- Default values carefully considered and documented
+- All attributes must have clear descriptions
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### IV. Error Handling & Diagnostics
+Implement robust error handling and user feedback:
+- Clear diagnostic messages with actionable context
+- Expected error cases explicitly handled and tested
+- Unexpected errors properly wrapped with context
+- Import behavior documented and tested
+- Resource state handled safely during failures
+- Follow HashiCorp's diagnostics best practices
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### V. Documentation & Examples
+Documentation is a primary project deliverable:
+- Resource/data source docs with all attributes defined
+- Example configurations demonstrating common use cases
+- Import documentation with step-by-step instructions
+- Release notes detailing all changes
+- Troubleshooting guide for common issues
+- Provider website docs kept in sync with codebase
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+## Security & Compliance
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+### Authentication & Authorization
+- Support secure authentication methods only
+- Sensitive fields marked in schema
+- Credentials handled according to HashiCorp guidelines
+- Audit logging for significant operations
+- Rate limiting and retry handling implemented
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+### API Integration
+- Implement proper API error handling
+- Follow API best practices and conventions
+- Version API clients appropriately
+- Handle API deprecations gracefully
+- Document API version compatibility
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+## Development Workflow
+
+### Feature Development Process
+1. Write acceptance test first (red)
+2. Implement minimal provider code to pass test (green)
+3. Refactor while maintaining test coverage
+4. Document the feature comprehensively
+5. Submit for review with test evidence
+
+### Code Review Requirements
+- Acceptance tests must pass
+- Documentation is complete and accurate 
+- Breaking changes clearly identified
+- Error handling meets standards
+- State management verified
+- Security implications considered
+
+### Release Process
+- Semantic versioning strictly followed
+- Release notes complete and accurate
+- Documentation updated
+- Migration guide for breaking changes
+- Security advisories if applicable
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+Constitution changes require:
+1. Documentation of rationale
+2. Review of impact on existing resources
+3. Migration plan for breaking changes
+4. Update of affected documentation
+5. Version bump according to semantic versioning
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 1.0.0 | **Ratified**: 2025-09-25 | **Last Amended**: 2025-09-25
+
+<!--
+Sync Impact Report:
+Initial constitution creation establishing core principles for provider development.
+
+Version: 1.0.0 (Initial creation)
+
+Core Principles Added:
+- Provider Foundations
+- Testing Fundamentals
+- Schema Contracts
+- Error Handling & Diagnostics
+- Documentation & Examples
+
+Sections Added:
+- Security & Compliance
+- Development Workflow
+- Governance
+
+Templates to Update:
+✅ .specify/templates/plan-template.md
+✅ .specify/templates/spec-template.md
+✅ .specify/templates/tasks-template.md
+-->

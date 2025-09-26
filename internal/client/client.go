@@ -22,6 +22,8 @@ type Client struct {
 	baseURL    string
 	httpClient *http.Client
 	token      string
+	retry      RetryConfig
+	logger     *Logger
 }
 
 // NewClient creates a new HiiRetail IAM API client
@@ -30,6 +32,8 @@ func NewClient(baseURL string, token string) *Client {
 		baseURL:    strings.TrimSuffix(baseURL, "/"),
 		httpClient: &http.Client{},
 		token:      token,
+		retry:      DefaultRetryConfig,
+		logger:     NewLogger(LogLevelInfo),
 	}
 }
 
@@ -131,21 +135,57 @@ func (c *Client) newRequest(ctx context.Context, method string, path string, bod
 
 // do performs an HTTP request and decodes the response
 func (c *Client) do(req *http.Request, v interface{}) error {
-	resp, err := c.httpClient.Do(req)
+	var attemptCount = 0
+	
+	resp, err := withRetry(req.Context(), c.retry, func() (*http.Response, error) {
+		attemptCount++
+		// Create a new request for each retry since the body might need to be re-read
+		newReq, err := c.newRequest(req.Context(), req.Method, strings.TrimPrefix(req.URL.Path, c.baseURL), nil)
+		if err != nil {
+			c.logger.Error("Failed to create request: %v", err)
+			return nil, err
+		}
+		newReq.Header = req.Header
+		
+		if req.Body != nil {
+			// Read the original body
+			body, err := io.ReadAll(req.Body)
+			if err != nil {
+				c.logger.Error("Failed to read request body: %v", err)
+				return nil, err
+			}
+			newReq.Body = io.NopCloser(strings.NewReader(string(body)))
+		}
+		
+		c.logger.LogRequest(newReq)
+		resp, err := c.httpClient.Do(newReq)
+		if err != nil {
+			c.logger.Error("Request failed: %v", err)
+			c.logger.LogRetry(attemptCount, err)
+			return nil, err
+		}
+		c.logger.LogResponse(resp)
+		
+		return resp, nil
+	})
+
 	if err != nil {
 		return fmt.Errorf("failed to execute request: %w", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode >= 400 {
+	if resp.StatusCode >= 400 && !isRetryable(resp, nil) {
 		body, _ := io.ReadAll(resp.Body)
+		c.logger.Error("Request failed with status %d: %s", resp.StatusCode, string(body))
 		return fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
 	if v != nil {
 		if err := json.NewDecoder(resp.Body).Decode(v); err != nil {
+			c.logger.Error("Failed to decode response: %v", err)
 			return fmt.Errorf("failed to decode response: %w", err)
 		}
+		c.logger.Debug("Successfully decoded response")
 	}
 
 	return nil

@@ -210,3 +210,158 @@ func TestGroupResource_Read(t *testing.T) {
 	assert.Equal(t, "test-group", actualState.Name.ValueString())
 	assert.Equal(t, "test description", actualState.Description.ValueString())
 }
+
+func TestGroupResource_Update(t *testing.T) {
+	mockClient := &MockClient{}
+	r := &GroupResource{}
+
+	configResp := &resource.ConfigureResponse{}
+	r.Configure(context.Background(), resource.ConfigureRequest{
+		ProviderData: mockClient,
+	}, configResp)
+	assert.False(t, configResp.Diagnostics.HasError())
+
+	expectedGroup := &client.Group{
+		ID:          "test-id",
+		Name:        "updated-group",
+		Description: "updated description",
+	}
+
+	mockClient.On("UpdateGroup", mock.Anything, "test-id", "updated-group", "updated description").Return(expectedGroup, nil)
+
+	ctx := context.Background()
+
+	// Get schema from resource
+	schemaResp := &resource.SchemaResponse{}
+	r.Schema(ctx, resource.SchemaRequest{}, schemaResp)
+
+	// Set up current state
+	state := tfsdk.State{
+		Schema: schemaResp.Schema,
+	}
+	_ = state.Set(ctx, &GroupResourceModel{
+		ID:          types.StringValue("test-id"),
+		Name:        types.StringValue("old-name"),
+		Description: types.StringValue("old description"),
+	})
+
+	// Set up planned new state
+	plan := tfsdk.Plan{
+		Schema: schemaResp.Schema,
+	}
+	_ = plan.Set(ctx, &GroupResourceModel{
+		ID:          types.StringValue("test-id"),
+		Name:        types.StringValue("updated-group"),
+		Description: types.StringValue("updated description"),
+	})
+
+	req := resource.UpdateRequest{
+		State: state,
+		Plan:  plan,
+	}
+	resp := &resource.UpdateResponse{
+		State: state,
+	}
+
+	r.Update(ctx, req, resp)
+
+	// Verify
+	assert.False(t, resp.Diagnostics.HasError())
+	mockClient.AssertExpectations(t)
+
+	// Check the state
+	var actualState GroupResourceModel
+	_ = resp.State.Get(ctx, &actualState)
+	assert.Equal(t, "test-id", actualState.ID.ValueString())
+	assert.Equal(t, "updated-group", actualState.Name.ValueString())
+	assert.Equal(t, "updated description", actualState.Description.ValueString())
+}
+
+func TestGroupResource_Delete(t *testing.T) {
+	mockClient := &MockClient{}
+	r := &GroupResource{}
+
+	configResp := &resource.ConfigureResponse{}
+	r.Configure(context.Background(), resource.ConfigureRequest{
+		ProviderData: mockClient,
+	}, configResp)
+	assert.False(t, configResp.Diagnostics.HasError())
+
+	mockClient.On("DeleteGroup", mock.Anything, "test-id").Return(nil)
+
+	ctx := context.Background()
+
+	// Get schema from resource
+	schemaResp := &resource.SchemaResponse{}
+	r.Schema(ctx, resource.SchemaRequest{}, schemaResp)
+
+	// Set up current state
+	state := tfsdk.State{
+		Schema: schemaResp.Schema,
+	}
+	_ = state.Set(ctx, &GroupResourceModel{
+		ID:          types.StringValue("test-id"),
+		Name:        types.StringValue("test-group"),
+		Description: types.StringValue("test description"),
+	})
+
+	req := resource.DeleteRequest{
+		State: state,
+	}
+	resp := &resource.DeleteResponse{}
+
+	r.Delete(ctx, req, resp)
+
+	// Verify
+	assert.False(t, resp.Diagnostics.HasError())
+	mockClient.AssertExpectations(t)
+}
+
+func TestGroupResource_Import(t *testing.T) {
+	mockClient := &MockClient{}
+	r := &GroupResource{}
+
+	configResp := &resource.ConfigureResponse{}
+	r.Configure(context.Background(), resource.ConfigureRequest{
+		ProviderData: mockClient,
+	}, configResp)
+	assert.False(t, configResp.Diagnostics.HasError())
+
+	expectedGroup := &client.Group{
+		ID:          "imported-id",
+		Name:        "imported-group",
+		Description: "imported description",
+	}
+
+	mockClient.On("GetGroup", mock.Anything, "imported-id").Return(expectedGroup, nil)
+
+	ctx := context.Background()
+
+	// Get schema from resource
+	schemaResp := &resource.SchemaResponse{}
+	r.Schema(ctx, resource.SchemaRequest{}, schemaResp)
+
+	req := resource.ImportStateRequest{
+		ID: "imported-id",
+	}
+	resp := &resource.ImportStateResponse{
+		State: tfsdk.State{
+			Schema: schemaResp.Schema,
+		},
+	}
+
+	r.ImportState(ctx, req, resp)
+
+	// Verify
+	assert.False(t, resp.Diagnostics.HasError())
+	
+	var actualState GroupResourceModel
+	diags := resp.State.Get(ctx, &actualState)
+	assert.False(t, diags.HasError())
+	
+	assert.Equal(t, expectedGroup.ID, actualState.ID.ValueString())
+	assert.Equal(t, expectedGroup.Name, actualState.Name.ValueString())
+	assert.Equal(t, expectedGroup.Description, actualState.Description.ValueString())
+	
+	mockClient.AssertExpectations(t)
+}

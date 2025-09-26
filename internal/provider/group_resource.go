@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/extenda/terraform-provider-hiiretail-iam/internal/client"
-	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -170,5 +169,17 @@ func (r *GroupResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 }
 
 func (r *GroupResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	// Read the group data directly
+	group, err := r.client.GetGroup(ctx, req.ID)
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read group during import, got error: %s", err))
+		return
+	}
+
+	// Set into state
+	resp.Diagnostics.Append(resp.State.Set(ctx, &GroupResourceModel{
+		ID:          types.StringValue(group.ID),
+		Name:        types.StringValue(group.Name),
+		Description: types.StringValue(group.Description),
+	})...)
 }
